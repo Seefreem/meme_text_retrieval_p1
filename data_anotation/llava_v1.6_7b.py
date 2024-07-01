@@ -1,6 +1,6 @@
 from llava.serve.cli import *
 import argparse
-from tqdm import tqdm
+import json
 
 # python -m llava.serve.cli --model-path liuhaotian/llava-v1.6-mistral-7b  --image-file ./memes/1a3hfy.jpg  --load-4bit
 # parser = argparse.ArgumentParser(description='Process some integers.')
@@ -15,7 +15,10 @@ parser.add_argument("--max-new-tokens", type=int, default=512)
 parser.add_argument("--load-8bit", action="store_true")
 parser.add_argument("--load-4bit", action="store_true")
 parser.add_argument("--debug", action="store_true")
-args = parser.parse_args('--model-path liuhaotian/llava-v1.6-mistral-7b  --image-file ./memes/1a3hfy.jpg  --load-4bit'.split())
+parser.add_argument("--all-memes-config", type=str, default='./data/meme_retrieval_data/final_processed_config_file.json')
+parser.add_argument("--meme-template-info", type=str, default='./data/50_template_info.json')
+parser.add_argument("--all-memes-img-dir", type=str, default='./data/meme_retrieval_data/dataset/data_unique_title_engaging/')
+args = parser.parse_args('--model-path liuhaotian/llava-v1.6-mistral-7b  --image-file ./memes/1a3hfy.jpg --load-4bit'.split())
 
 
 # Model
@@ -42,29 +45,39 @@ if args.conv_mode is not None and conv_mode != args.conv_mode:
 else:
     args.conv_mode = conv_mode
 
+# Load the info of all memes 
+with open(args.all_memes_config, 'r', encoding='utf-8') as json_file:
+    final_processed_config_file = json.load(json_file)
 
+# Load about info
+with open(args.meme_template_info, 'r', encoding='utf-8') as json_file:
+    template_info_50 = json.load(json_file)
 
-about_section = [r'Batman Slapping Robin, also known as "My Parents Are Dead," is an exploitable image of the DC Comics superhero Batman slapping his protégé Robin in mid-conversation. Taken from a comic book published in 1965, the single-panel illustration has inspired a series of parodies featuring custom-captioned speech bubbles on 4chan, Reddit and elsewhere.',
-                 r'You Like Krabby Patties Don’t You, Squidward?, also known by the snowclone "You Like X, Don’t You, Y?", is a reaction image, catchphrase and exploitable taken from an episode of SpongeBob SquarePants showing SpongeBob with a comically knowing grin after he realizes that Squidward likes Krabby Patties. The image has been used in similar contexts online, usually from a person discovering another\'s secret, and sometimes as a phrasal template with the key elements replaced to make a pop culture reference.',
-                 r'Philosoraptor is an advice animal image macro series featuring an illustration of a Velociraptor paired with captions depicting the dinosaur as being deeply immersed in metaphysical inquiries or unraveling quirky paradoxes.',
-                 r'X, X Everywhere is a phrasal template typically used for a wide range of cultural references, from quotable lines heard in popular films and TV shows to more obscure things found in viral videos and games. Many instances of "X Everywhere" may be seen as an indicator for emerging trends, while some should be read as a grievance or complaint against them, depending on the context.',
-                 r'Hide The Pain Harold, also simply referred to as "Harold" or "Maurice" is the nickname given to a senior stock photography model whose facial expression appears to indicate suppressed pain and/or discomfort.']
-img_dirs = ["./memes/1a3hfy.jpg", 
-            "./memes/1a3k9c.jpg",
-            "./memes/1a8wvp.jpg",
-            "./memes/1abayq.jpg",
-            "./memes/1abovr.jpg"]
+# Prepare img_dir and about_section
+meme_info_all = []
+for i in final_processed_config_file:
+    meme_name = i['url'].split("/")[-1].split(".json")[0]
+    meme_type = i['type']
+    meme_info = {"img_dir": args.all_memes_img_dir + meme_name,
+                 "about_section":template_info_50[i['type']]['about']}
+    meme_info_all.append(meme_info)
+print('Example: ', meme_info_all[0])
+
+# Generate prompts
 inputs_template = []
-for i in range(len(about_section)):
-    inputs_template.append({'image_dir':img_dirs[i], 'prompt':f'Here is the context of the meme: "{about_section[i]}". First, based the given context, read the text in this image and explain the meme. Then, provide information for the following categories: \n Visual Elaboration (focus on the main content): \n Detected Text: \n Meaning of the Meme (briefly):'})
-    inputs_template.append({'image_dir':img_dirs[i], 'prompt':f'Here is the context of the meme: "{about_section[i]}". First, based the given context, read the text in this image and explain the meme. Then, choose the most suitable literary device from the given category words: allegory, alliteration, allusion, amplification, anagram, analogy, anthropomorphism, antithesis, chiasmus, circumlocution, euphemism, hyperbole, imagery, metaphor, onomatopoeia, oxymoron, paradox, personification, portmanteau, pun, satire, simile, and symbolism. If no suitable word, use "None" as the category word. Only reply with the chosen word.'})
-    inputs_template.append({'image_dir':img_dirs[i], 'prompt':f'Here is the context of the meme: "{about_section[i]}". First, based the given context, explain the meme. Then, choose the most suitable emotion word from the given category words: fear, anger, joy, sadness, surprise, disgust, guilt, contempt, shame, embarrassment, envy, jealousy, love, hate, and interest. If no suitable word, use "None" as the category word.  Only reply with the chosen word.'})
+for meme_info in meme_info_all:
+    about = meme_info['about_section']
+    inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':f'Here is the context of the meme: "{about}". First, based the given context, read the text in this image and explain the meme. Then, provide information for the following categories: \n Visual Elaboration (focus on the main content): \n Detected Text: \n Meaning of the Meme (briefly):'})
+    inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':f'Here is the context of the meme: "{about}". First, based the given context, read the text in this image and explain the meme. Then, choose the most suitable literary device from the given category words: allegory, alliteration, allusion, amplification, anagram, analogy, anthropomorphism, antithesis, chiasmus, circumlocution, euphemism, hyperbole, imagery, metaphor, onomatopoeia, oxymoron, paradox, personification, portmanteau, pun, satire, simile, and symbolism. If no suitable word, use "None" as the category word. Only reply with the chosen word.'})
+    inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':f'Here is the context of the meme: "{about}". First, based the given context, explain the meme. Then, choose the most suitable emotion word from the given category words: fear, anger, joy, sadness, surprise, disgust, guilt, contempt, shame, embarrassment, envy, jealousy, love, hate, and interest. If no suitable word, use "None" as the category word.  Only reply with the chosen word.'})
     
-    inputs_template.append({'image_dir':img_dirs[i], 'prompt':'First, read the text in this image and explain the meme. Then, provide information for the following categories: Visual Elaboration (focus on the main content): Detected Text: Meaning of the Meme (briefly):'})
-    inputs_template.append({'image_dir':img_dirs[i], 'prompt':'First, read the text in this image and explain the meme. Then, choose the most suitable literary device from the given category words: allegory, alliteration, allusion, amplification, anagram, analogy, anthropomorphism, antithesis, chiasmus, circumlocution, euphemism, hyperbole, imagery, metaphor, onomatopoeia, oxymoron, paradox, personification, portmanteau, pun, satire, simile, and symbolism. If no suitable word, use "None" as the category word. Only reply with the chosen word.'})
-    inputs_template.append({'image_dir':img_dirs[i], 'prompt':'First, read the text in this image and explain the meme. Then, choose the most suitable emotion word from the given category words: fear, anger, joy, sadness, surprise, disgust, guilt, contempt, shame, embarrassment, envy, jealousy, love, hate, and interest. If no suitable word, use "None" as the category word.  Only reply with the chosen word.'})
+    inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':'First, read the text in this image and explain the meme. Then, provide information for the following categories: Visual Elaboration (focus on the main content): Detected Text: Meaning of the Meme (briefly):'})
+    inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':'First, read the text in this image and explain the meme. Then, choose the most suitable literary device from the given category words: allegory, alliteration, allusion, amplification, anagram, analogy, anthropomorphism, antithesis, chiasmus, circumlocution, euphemism, hyperbole, imagery, metaphor, onomatopoeia, oxymoron, paradox, personification, portmanteau, pun, satire, simile, and symbolism. If no suitable word, use "None" as the category word. Only reply with the chosen word.'})
+    inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':'First, read the text in this image and explain the meme. Then, choose the most suitable emotion word from the given category words: fear, anger, joy, sadness, surprise, disgust, guilt, contempt, shame, embarrassment, envy, jealousy, love, hate, and interest. If no suitable word, use "None" as the category word.  Only reply with the chosen word.'})
     
 
+# inputs_template
+from tqdm import tqdm, trange
 
 responds = []
 for i in tqdm(range(len(inputs_template)), desc='Processing'):    

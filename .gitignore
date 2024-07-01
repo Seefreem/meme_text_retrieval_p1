@@ -7,11 +7,13 @@ dist
 # Log
 *.log
 *.log.*
-*.json
+./*.json
 *.jsonl
 
 # Data
 !**/alpaca-data-conversation.json
+data/meme_retrieval_data
+*.zip
 
 # Editor
 .idea
@@ -27,6 +29,7 @@ ckpts*
 
 .ipynb_checkpoints
 *.ipynb
+workspace.md
 
 # DevContainer
 !.devcontainer/*
