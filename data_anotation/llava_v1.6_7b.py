@@ -136,11 +136,10 @@ for i in tqdm(range(len(inputs_template)), desc='Processing'):
     # if args.debug:
     #     print("\n", {"prompt": prompt, "outputs": outputs}, "\n")
 
-
-    import json 
+    
 
 logs = []
-for i in range(len(inputs_template)):
+for i in range(len(responds)):
     logs.append(inputs_template[i])
     logs[-1]['respond'] = responds[i]
    
