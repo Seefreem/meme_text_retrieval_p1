@@ -51,6 +51,11 @@ pip install -e .
 python data_annotation.llava_v1.6_7b.py
 ```
 
+## GPT-4o for data annotation
+'''
+python -m  data_annotation.gpt_4o --start-id 1  --file-length 500 
+'''
+
 ## CLI Inference
 
 Chat about images using LLaVA without the need of Gradio interface. It also supports multiple GPUs, 4-bit and 8-bit quantized inference. With 4-bit quantization, for our LLaVA-1.5-7B, it uses less than 8GB VRAM on a single GPU.
