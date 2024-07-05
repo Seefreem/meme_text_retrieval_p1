@@ -52,9 +52,9 @@ python data_annotation.llava_v1.6_7b.py
 ```
 
 ## GPT-4o for data annotation
-'''
+```shell
 python -m  data_annotation.gpt_4o --start-id 1  --file-length 500 
-'''
+```
 
 ## CLI Inference
 

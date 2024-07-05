@@ -14,6 +14,7 @@ dist
 !**/alpaca-data-conversation.json
 data/meme_retrieval_data
 *.zip
+data/img_prompt_respond*.json
 
 # Editor
 .idea

@@ -95,7 +95,10 @@ def main(args):
           json.dump(responds, outfile, indent=4)
       last_idx = idx + 1
       responds = []
-
+  
+  with open(f"img_prompt_respond_{last_idx+1}-end.json", "w") as outfile: 
+      json.dump(responds, outfile, indent=4)
+      
 
 
 if __name__ == "__main__":
