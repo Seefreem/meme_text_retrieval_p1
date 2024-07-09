@@ -13,6 +13,8 @@ dist
 # Data
 !**/alpaca-data-conversation.json
 data/meme_retrieval_data
+data/memecap
+data/figmemes
 *.zip
 data/img_prompt_respond*.json
 

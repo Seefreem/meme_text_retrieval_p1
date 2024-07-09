@@ -64,10 +64,8 @@ def main(args):
   api_key = conf["openai_api_key"]
   
   # Get prompts
-  prompts = prepare_prompts('./data/meme_retrieval_data/final_processed_config_file.json',
-                            './data/50_template_info.json',
-                            './data/meme_retrieval_data/dataset/data_unique_title_engaging/',
-                            model='gpt-4o-all-data')
+  prompts = prepare_prompts(dataset = args.dataset,
+                            model = args.prompt_type)
 
   # Call GPT-4o
   responds = []
@@ -76,7 +74,7 @@ def main(args):
 
   for idx in tqdm(range(len(prompts)), desc='Processing'):
     prompt = prompts[idx]
-    if (idx+1) >= args.stop_id and args.stop_id > 0:
+    if (idx+1) > args.stop_id and args.stop_id > 0:
         break
     if (idx+1) < args.start_id: 
       continue
@@ -106,6 +104,8 @@ if __name__ == "__main__":
     parser.add_argument("--stop-id", type=int, default=-1)
     parser.add_argument("--start-id", type=int, default=1)
     parser.add_argument("--file-length", type=int, default=500)
+    parser.add_argument("--dataset", type=str, default='meme_text_retrieval')
+    parser.add_argument("--prompt-type", type=str, default='gpt-4o-all-data')
     args = parser.parse_args()
     main(args)
 
