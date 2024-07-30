@@ -33,6 +33,7 @@ ckpts*
 .ipynb_checkpoints
 *.ipynb
 workspace.md
+data_backup*
 
 # DevContainer
 !.devcontainer/*

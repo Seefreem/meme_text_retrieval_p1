@@ -5,6 +5,9 @@ import os
 from data_annotation.utilities import *
 from tqdm import tqdm, trange
 
+'''
+Version gpt-4o-2024-05-13
+'''
 
 # Function to encode the image
 def encode_image(image_path):
