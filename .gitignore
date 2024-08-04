@@ -17,6 +17,7 @@ data/memecap
 data/figmemes
 *.zip
 data/img_prompt_respond*.json
+*embeddings
 
 # Editor
 .idea

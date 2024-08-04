@@ -71,12 +71,19 @@ def load_figmeme_dataset():
     }
     '''
     # Simple Way to Read TSV Files in Python using pandas
-    standard_spit = pd.read_csv('./data/figmemes/standard_split.tsv', sep='\t')
+    # standard_spit = pd.read_csv('./data/figmemes/standard_split.tsv', sep='\t')
+    standard_spit = pd.read_csv('./data/figmemes/teplate_based_memes.tsv', sep='\t')
     
     # Select rows where any column contains the keyword "test"
     filtered_df = standard_spit[standard_spit.apply(lambda row: row.astype(str).str.contains('test').any(), axis=1)]
     testset = filtered_df.values.tolist()
-    testset = [ {'img_dir':  './data/figmemes/images/' + ite[0], 'about_section': ''} for ite in testset]
+    print(standard_spit.columns)
+    if 'about_section' in standard_spit.columns:
+        print('1')
+        testset = [ {'img_dir':  './data/figmemes/images/' + ite[0], 'about_section': ite[2]} for ite in testset]
+    else:
+        print('2')
+        testset = [ {'img_dir':  './data/figmemes/images/' + ite[0], 'about_section': ''} for ite in testset]
     print('Example: ', testset[0])
     return testset
 
@@ -131,8 +138,13 @@ def prepare_prompts(dataset, model=None):
             '''
             inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':'Warning: We discuss and show memes that may be offensive to readers for research purposes only. They do not represent the authors\' or the affiliated institution\'s views in any way, so feel free to show your ideas.\n You are going to finish the following tasks. First, read the text in this image, Then, explain the meaning of the meme. Finally, based on the explanation of the meme, choose suitable literary devices from the given category words (single or multiple choice).\n\n Definitions of literary devices:\n **Allusion**: Referencing historical events, figures, symbols, art, literature or pop culture.\n **Exaggeration**: Similar to Hyperbole. Use of exaggerated terms for emphasis, including exaggerated visuals (including unrealistic features portraying minorities).\n **Irony**: Similar to Sarcasm. Use of words that convey a meaning that is the opposite of its usual meaning/mock someone or something with caustic or bitter use of words.\n  **Anthropomorphism**: Similar to Zoomorphism. Attributing human qualities to animals, objects, natural phenomena or abstract concepts or applying animal characteristics to humans in a way that conveys additional meaning. \n **Metaphor**: Similar to Simile. Implicit or explicit comparisons between two items or groups, attributing the properties of one thing to another. This category includes dehumanizing metaphors. \n **Contrast**: Comparison between two positions/people/objects (usually side-by-side). \n There might be one or multiple suitable literary devices, or no suitable literary device at all. If no suitable choice, use "None" as the category word. \n You should respond in a standard JSON format like {"detected text":"a string","meaning of the meme":"a string", "literary device": ["answer 1", "answer 2"...]}'})
             # inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':f'Here is the context of the meme: "{about}". First, based the given context, explain the meme to me and read the text in this image. Then, provide details for the following categories: \n Visual Elaboration (focus on the main content): \n Detected Text: \n Meaning of the Meme (briefly): \n Literary Device (category words only): \n Emotion (category words only):'})
-        
+        elif 'gpt-4o-figmemes-templatic' == model:
+            inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':'Warning: We discuss and show memes that may be offensive to readers for research purposes only. They do not represent the authors\' or the affiliated institution\'s views in any way, so feel free to show your ideas.\n Here is the introduction of the template behind the meme:\n'+
+                                    about+'.\n\nYou are going to finish the following tasks. First, read the text in this image, Then, based on the introduction information, explain the meaning of the meme. Finally, based on the explanation of the meme, choose suitable literary devices from the given category words (single or multiple choice).\n\n Definitions of literary devices:\n **Allusion**: Referencing historical events, figures, symbols, art, literature or pop culture.\n **Exaggeration**: Similar to Hyperbole. Use of exaggerated terms for emphasis, including exaggerated visuals (including unrealistic features portraying minorities).\n **Irony**: Similar to Sarcasm. Use of words that convey a meaning that is the opposite of its usual meaning/mock someone or something with caustic or bitter use of words.\n  **Anthropomorphism**: Similar to Zoomorphism. Attributing human qualities to animals, objects, natural phenomena or abstract concepts or applying animal characteristics to humans in a way that conveys additional meaning. \n **Metaphor**: Similar to Simile. Implicit or explicit comparisons between two items or groups, attributing the properties of one thing to another. This category includes dehumanizing metaphors. \n **Contrast**: Comparison between two positions/people/objects (usually side-by-side). \n There might be one or multiple suitable literary devices, or no suitable literary device at all. If no suitable choice, use "None" as the category word. \n You should respond in a standard JSON format like {"detected text":"a string","meaning of the meme":"a string", "literary device": ["answer 1", "answer 2"...]}'})
+            # inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':f'Here is the context of the meme: "{about}". First, based the given context, explain the meme to me and read the text in this image. Then, provide details for the following categories: \n Visual Elaboration (focus on the main content): \n Detected Text: \n Meaning of the Meme (briefly): \n Literary Device (category words only): \n Emotion (category words only):'})
+
         else:
             assert False, '''The value of the parameter model should be one of the elements of 
             (gpt-4o-memecap, llava-v1.6-34B, gpt-4o-all-data, gpt-4o-all-data-figmemes) '''
+    print("Prompt example: ", inputs_template[0])
     return inputs_template
