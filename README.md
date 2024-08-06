@@ -29,7 +29,7 @@ pip install -e .
 ```
 
 3. Install additional packages for training cases
-```
+```Shell
 pip install -e ".[train]"
 pip install flash-attn --no-build-isolation
 ```
