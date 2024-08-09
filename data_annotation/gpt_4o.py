@@ -15,10 +15,22 @@ def encode_image(image_path):
     return base64.b64encode(image_file.read()).decode('utf-8')
 
 
-def call_api(image_path = None, prompt=None, api_key=None):
+def call_api(image_paths: list[str], prompt=None, api_key=None):
   # Getting the base64 string
-  # handling missing files 
-  base64_image = encode_image(image_path)
+  print("Images:", image_paths)
+  base64_images = [encode_image(image_path) for image_path in image_paths]
+  base64_images_objs = [{
+            "type": "image_url",
+            "image_url": {
+              "url": f"data:image/jpeg;base64,{image}",
+              "detail": "low" 
+            },
+          } for image in base64_images]
+
+  content = [{
+            "type": "text",
+            "text": prompt,
+          }] + base64_images_objs
 
   headers = {
     "Content-Type": "application/json",
@@ -30,19 +42,7 @@ def call_api(image_path = None, prompt=None, api_key=None):
     "messages": [
       {
         "role": "user",
-        "content": [
-          {
-            "type": "text",
-            "text": prompt
-          },
-          {
-            "type": "image_url",
-            "image_url": {
-              "url": f"data:image/jpeg;base64,{base64_image}",
-              "detail": "low" # low image quality indicating less token consumptions
-            }
-          }
-        ]
+        "content": content
       }
     ],
     "max_tokens": 4000
@@ -54,7 +54,7 @@ def call_api(image_path = None, prompt=None, api_key=None):
      response.json()['choices'][0]['message']['content']
     #  print(response.json()['choices'][0]['message']['content'])
   except:
-     print(f"Error: An exception occurred, img_dir: {image_path}")
+     print(f"Error: An exception occurred, img_dirs: {image_paths}")
      
   return response
 
@@ -81,8 +81,10 @@ def main(args):
         break
     if (idx+1) < args.start_id: 
       continue
-    
-    response = call_api(prompt['image_dir'], prompt['prompt'], api_key)
+    if args.few_shot_with_example_images:
+      response = call_api(args.example_images + [prompt['image_dir']], prompt['prompt'], api_key)
+    else: 
+      response = call_api([prompt['image_dir']], prompt['prompt'], api_key)
     try: 
       response.json()['choices'][0]['message']['content'] # try to get generated text from the message
       responds.append(prompt)
@@ -109,6 +111,12 @@ if __name__ == "__main__":
     parser.add_argument("--file-length", type=int, default=500)
     parser.add_argument("--dataset", type=str, default='meme_text_retrieval')
     parser.add_argument("--prompt-type", type=str, default='gpt-4o-all-data')
+    parser.add_argument("--few-shot-with-example-images", type=bool, default=False)
+    example_image_paths = ['./data/figmemes/images/1483414267738.jpg', 
+                          './data/figmemes/images/1484978535453.jpg', 
+                          './data/figmemes/images/1483781574074.png']
+    parser.add_argument("--example-images", type=list, default=example_image_paths)
     args = parser.parse_args()
     main(args)
+
 
