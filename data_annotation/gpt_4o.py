@@ -112,11 +112,18 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, default='meme_text_retrieval')
     parser.add_argument("--prompt-type", type=str, default='gpt-4o-all-data')
     parser.add_argument("--few-shot-with-example-images", type=bool, default=False)
-    example_image_paths = ['./data/figmemes/images/1483414267738.jpg', 
-                          './data/figmemes/images/1484978535453.jpg', 
-                          './data/figmemes/images/1483781574074.png']
-    parser.add_argument("--example-images", type=list, default=example_image_paths)
+    parser.add_argument("--example-images", type=list, default=[])
     args = parser.parse_args()
+
+    if args.few_shot_with_example_images and args.dataset == "figmemes":
+      args.example_images = ['./data/figmemes/images/1483414267738.jpg', 
+                            './data/figmemes/images/1484978535453.jpg', 
+                            './data/figmemes/images/1483781574074.png']
+    elif args.few_shot_with_example_images and args.dataset == "memecap":
+      args.example_images = ['./data/memecap/memes/memes/memes_eiide7.png', 
+                            './data/memecap/memes/memes/memes_eimmhx.png', 
+                            './data/memecap/memes/memes/memes_ynm613.png']
+    print(args.example_images)
     main(args)
 
 
