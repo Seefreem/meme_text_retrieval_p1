@@ -146,19 +146,26 @@ def memecap(args):
     with open(test_memes_config_file, 'r', encoding='utf-8') as json_file:
         test_memes_configs = json.load(json_file)
     # Prepare img_dir and about_section
-    test_meme_info_all = {"img_path": []}
+    test_meme_info_all = {"img_path": [], 'ocr_text':[]}
     for conf in test_memes_configs:
         test_meme_info_all["img_path"].append(memes_img_dir + conf['img_fname'])
+        test_meme_info_all["ocr_text"].append(conf['title'])
 
     # Training and validation sets
     with open(train_val_memes_config_file, 'r', encoding='utf-8') as json_file:
         train_val_memes_configs = json.load(json_file)
     # Prepare img_dir and about_section
     train_val_meme_info_all = []
+    train_val_meme_ocr_all = []
     for conf in train_val_memes_configs:
         train_val_meme_info_all.append(memes_img_dir + conf['img_fname'])
-    train_meme_info_all = {"img_path": train_val_meme_info_all[:int(len(train_val_meme_info_all) * 0.8)]}
-    val_meme_info_all = {"img_path": train_val_meme_info_all[int(len(train_val_meme_info_all) * 0.8):]}
+        train_val_meme_ocr_all.append(conf['title'])
+    
+    train_meme_info_all = {"img_path": train_val_meme_info_all[:int(len(train_val_meme_info_all) * 0.8)],
+                           "ocr_text": train_val_meme_info_all[:int(len(train_val_meme_ocr_all) * 0.8)]}
+    val_meme_info_all = {"img_path": train_val_meme_info_all[int(len(train_val_meme_info_all) * 0.8):], 
+                         "ocr_text": train_val_meme_info_all[int(len(train_val_meme_ocr_all) * 0.8):]}
+
 
     dataset = datasets.DatasetDict({"train": datasets.Dataset.from_dict(train_meme_info_all), 
                                     "validation": datasets.Dataset.from_dict(val_meme_info_all), 
