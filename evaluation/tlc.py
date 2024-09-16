@@ -37,15 +37,15 @@ class TemplateLabelCounter(object):
                 if self.args.combine not in ['None']:
                     about_embeddings = self.get_template_about()
                     self.template_embeddings = (self.template_embeddings, about_embeddings)
-                    self.template_embeddings = self.combine_features(self.template_embeddings)
+                    self.template_embeddings = self.combine_features(self.template_embeddings, dataset="template")
             else:
                 self.get_template_example_embeddings()
                 if self.args.combine not in ['None']:
                     about_embeddings = self.get_example_about()
                     self.template_embeddings = (self.template_embeddings, about_embeddings)
-                    self.template_embeddings = self.combine_features(self.template_embeddings)
+                    self.template_embeddings = self.combine_features(self.template_embeddings, dataset="template")
             if self.args.combine not in ['None']:
-                self.get_combined_embeddings()   
+                self.get_combined_embeddings(self.args)   
             else:
                 self.get_meme_embeddings()
             
@@ -61,7 +61,7 @@ class TemplateLabelCounter(object):
                     self.info = pickle.load(handle)
                 self.template_embeddings = np.load('{}about_embeddings.npy'.format(feature_dir))
             
-            elif not self.args.just_text and self.args.combine in ['None', 'fancy', 'fusion', 'concatenate']:   
+            elif not self.args.just_text and self.args.combine in ['None', 'fancy', 'fusion', 'concatenate', 'ablation']:   
                 combine = self.args.combine
                 feature_dir = f'embeddings/{feat}/{combine}/'
                 print('feature_dir ', feature_dir)
@@ -89,7 +89,7 @@ class TemplateLabelCounter(object):
                 ds_dir = f'{feature_dir}{self.args.dataset}/'
                 self.train_embeddings = np.load('{}train_ocr_embeddings.npy'.format(ds_dir))
                 self.test_embeddings = np.load('{}test_ocr_embeddings.npy'.format(ds_dir))
-            elif not self.args.just_text and self.args.combine in ['None', 'fancy', 'fusion', 'concatenate']:
+            elif not self.args.just_text and self.args.combine in ['None', 'fancy', 'fusion', 'concatenate', 'ablation']:
                 ds_dir = f'{feature_dir}{self.args.dataset}/' 
                 self.train_embeddings = np.load('{}train_embeddings.npy'.format(ds_dir))
                 self.test_embeddings = np.load('{}test_embeddings.npy'.format(ds_dir))
@@ -209,13 +209,20 @@ class TemplateLabelCounter(object):
                 # self.info.append(template_info)
                 for template in template_info.keys():
                     template = template_info[template]
-                    file_path = '../data/meme_retrieval_data/templates/' + template["out_paths"][0].split('/')[-1]
+                    file_path = ''
+                    if self.args.dataset == 'meme_text':
+                        file_path = template["out_paths"][0]
+                    else:
+                        file_path = '../data/meme_retrieval_data/templates/' + template["out_paths"][0].split('/')[-1]
+                        template["out_paths"][0] = file_path
                     if os.path.exists(file_path):
                         # This process is the pre-process of CLIP model.
                         im = self.preprocess(PIL.Image.open(file_path))
                         self.info.append(template_info)
                         template_images.append(im)
-        
+                    else:
+                        print("Not found:", file_path)
+            print("in total: ", len(template_images))
         self.template_embeddings = self.clip_features(template_images)
 
     
@@ -279,7 +286,7 @@ class TemplateLabelCounter(object):
         self.clean_up()
         return embeddings
     
-    def combine_features(self, embeddings):
+    def combine_features(self, embeddings, dataset=None):
         print(inspect.currentframe().f_code.co_name)
         pic, text = embeddings
         
@@ -292,10 +299,17 @@ class TemplateLabelCounter(object):
             output = np.concatenate((pic, text), axis=1)
         
         elif self.args.combine in ['fancy']:
-            print('fancy')
+            print('fancy', pic.shape, text.shape)
             pic = normalize(pic, axis=1, norm='l2')
             text = normalize(text, axis=1, norm='l2')
             output = np.mean([pic, text], axis=0)
+        elif self.args.combine in ['ablation']:
+            print('ablation')
+            if dataset in ['template']:
+                output = normalize(pic, axis=1, norm='l2')
+            else:
+                output = pic - text
+                output = normalize(output, axis=1, norm='l2')
         
         return output
     
@@ -368,24 +382,41 @@ class TemplateLabelCounter(object):
             self.val_embeddings = None
         self.test_embeddings = self.ds_to_embeddings(self.dataset['test'])
     
-    def get_combined_embeddings(self):
+    def get_combined_embeddings(self, args):
         print(inspect.currentframe().f_code.co_name)
         self.train_embeddings = self.ds_to_embeddings(self.dataset['train'])
-        train_ocr = self.clip_text(self.dataset['train']['ocr_text'])
-        self.train_embeddings = (self.train_embeddings, train_ocr)
+        if args.text_features == 'ocr_text':
+            train_text = self.clip_text(self.dataset['train']['ocr_text'])
+        elif args.text_features == 'img_captions':
+            train_text = self.clip_text(self.dataset['train']['img_captions'])
+        else:
+            print("Error, unknown text feature")
+        self.train_embeddings = (self.train_embeddings, train_text)
         self.train_embeddings = self.combine_features(self.train_embeddings)
 
         try:
             self.val_embeddings = self.ds_to_embeddings(self.dataset['validation'])
-            val_ocr = self.clip_text(self.dataset['validation']['ocr_text'])
-            self.val_embeddings = (self.val_embeddings, val_ocr)
+            # val_ocr = self.clip_text(self.dataset['validation']['ocr_text'])
+            if args.text_features == 'ocr_text':
+                val_text = self.clip_text(self.dataset['validation']['ocr_text'])
+            elif args.text_features == 'img_captions':
+                val_text = self.clip_text(self.dataset['validation']['img_captions'])
+            else:
+                print("Error, unknown text feature")
+            self.val_embeddings = (self.val_embeddings, val_text)
             self.val_embeddings = self.combine_features(self.val_embeddings)
         except KeyError:
             self.val_embeddings = None
         
         self.test_embeddings = self.ds_to_embeddings(self.dataset['test'])
-        test_ocr = self.clip_text(self.dataset['test']['ocr_text'])
-        self.test_embeddings = (self.test_embeddings, test_ocr)
+        # test_ocr = self.clip_text(self.dataset['test']['ocr_text'])
+        if args.text_features == 'ocr_text':
+            test_text = self.clip_text(self.dataset['test']['ocr_text'])
+        elif args.text_features == 'img_captions':
+            test_text = self.clip_text(self.dataset['test']['img_captions'])
+        else:
+            print("Error, unknown text feature")
+        self.test_embeddings = (self.test_embeddings, test_text)
         self.test_embeddings = self.combine_features(self.test_embeddings)
     
     def train_late_fusion(self):
@@ -744,7 +775,7 @@ class TemplateLabelCounter(object):
             print()
 
 
-    def meme2template(self, max_distance = 10):
+    def meme2template(self, max_distance = 10, output_file_name = "meme2template.json"):
         '''
         This function retrieve templates for each meme from the target dataset. 
         '''
@@ -757,7 +788,7 @@ class TemplateLabelCounter(object):
         # Find the k neighbors 
         distances, test_indices = self.knn.kneighbors(self.test_embeddings, 
                                                     return_distance=True)
-
+        # print("distances:", distances)
         # Find the nearest template and save the results in a JSON file
         # template_dict = dict()
         meme2template_json = []
@@ -786,10 +817,12 @@ class TemplateLabelCounter(object):
                                             'template_file_name': template_file_names,
                                             'about_section': about}))
 
-        with open(f"meme2template.json", "w") as outfile: 
+        with open(output_file_name, "w") as outfile: 
             json.dump(meme2template_json, outfile, indent=4)    
 
         print(f"In total, there are {counter} instances.")
+
+        return meme2template_json
     
     
     

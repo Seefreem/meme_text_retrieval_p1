@@ -136,30 +136,115 @@ def load_dataset(args):
         return figmemes(args)
     elif args.dataset == 'memecap':
         return memecap(args)
+    elif args.dataset == 'meme_text':
+        return meme_text(args)
 
-def memecap(args):
-    test_memes_config_file = '../data/memecap/meme-cap-main/data/memes-test.json'
-    train_val_memes_config_file = '../data/memecap/meme-cap-main/data/memes-trainval.json'
-    memes_img_dir = '../data/memecap/memes/memes/'
+def meme_text(args):
+    test_memes_config_file = '../data/meme_retrieval_data/meme_text_retrieval_20_samples.json'
+    train_val_memes_config_file = test_memes_config_file
+    memes_img_dir = '.'
 
-    # Test set
+    # Only the test set matters 
     with open(test_memes_config_file, 'r', encoding='utf-8') as json_file:
         test_memes_configs = json.load(json_file)
     # Prepare img_dir and about_section
-    test_meme_info_all = {"img_path": []}
+    test_meme_info_all = {"img_path": [], 'ocr_text':[], "img_captions": []}
     for conf in test_memes_configs:
         test_meme_info_all["img_path"].append(memes_img_dir + conf['img_fname'])
+        test_meme_info_all["ocr_text"].append(conf['ocr'])
+        test_meme_info_all["img_captions"].append(" ".join(conf['img_captions']))
+        # test_meme_info_all["ocr_text"].append(" ".join(conf['meme_captions']))
+        # test_meme_info_all["ocr_text"].append(conf['ocr'])
+
 
     # Training and validation sets
     with open(train_val_memes_config_file, 'r', encoding='utf-8') as json_file:
         train_val_memes_configs = json.load(json_file)
     # Prepare img_dir and about_section
     train_val_meme_info_all = []
+    train_val_meme_ocr_all = []
+    train_val_meme_img_cap_all = []
     for conf in train_val_memes_configs:
         train_val_meme_info_all.append(memes_img_dir + conf['img_fname'])
-    train_meme_info_all = {"img_path": train_val_meme_info_all[:int(len(train_val_meme_info_all) * 0.8)]}
-    val_meme_info_all = {"img_path": train_val_meme_info_all[int(len(train_val_meme_info_all) * 0.8):]}
+        train_val_meme_ocr_all.append(conf['ocr'])
+        train_val_meme_img_cap_all.append(" ".join(conf['img_captions']))
+    
+    train_meme_info_all = {"img_path": train_val_meme_info_all[:int(len(train_val_meme_info_all) * 0.8)],
+                           "ocr_text": train_val_meme_ocr_all[:int(len(train_val_meme_ocr_all) * 0.8)],
+                           "img_captions": train_val_meme_img_cap_all[:int(len(train_val_meme_img_cap_all) * 0.8)]}
+    val_meme_info_all = {"img_path": train_val_meme_info_all[int(len(train_val_meme_info_all) * 0.8):], 
+                         "ocr_text": train_val_meme_ocr_all[int(len(train_val_meme_ocr_all) * 0.8):],
+                         "img_captions": train_val_meme_img_cap_all[int(len(train_val_meme_img_cap_all) * 0.8):]}
+    
+    dataset = datasets.DatasetDict({"train": datasets.Dataset.from_dict(train_meme_info_all), 
+                                    "validation": datasets.Dataset.from_dict(val_meme_info_all), 
+                                    "test": datasets.Dataset.from_dict(test_meme_info_all)})
+    LABEL_LIST = []
+    return LABEL_LIST, dataset
 
+
+def memecap(args):
+    test_memes_config_file = '../data/memecap/meme-cap-main/data/memes-test.json'
+    train_val_memes_config_file = '../data/memecap/meme-cap-main/data/memes-trainval.json'
+    memes_img_dir = '../data/memecap/memes/memes/'
+
+    # # Test set
+    # with open(test_memes_config_file, 'r', encoding='utf-8') as json_file:
+    #     test_memes_configs = json.load(json_file)
+    # # Prepare img_dir and about_section
+    # test_meme_info_all = {"img_path": [], 'ocr_text':[], "img_captions": []}
+    # for conf in test_memes_configs:
+    #     test_meme_info_all["img_path"].append(memes_img_dir + conf['img_fname'])
+    #     test_meme_info_all["ocr_text"].append("None") # conf['ocr']
+    #     test_meme_info_all["img_captions"].append(" ".join(conf['img_captions']))
+
+    # # Training and validation sets
+    # with open(train_val_memes_config_file, 'r', encoding='utf-8') as json_file:
+    #     train_val_memes_configs = json.load(json_file)
+    # # Prepare img_dir and about_section
+    # train_val_meme_info_all = []
+    # train_val_meme_ocr_all = []
+    # for conf in train_val_memes_configs:
+    #     train_val_meme_info_all.append(memes_img_dir + conf['img_fname'])
+    #     train_val_meme_ocr_all.append(conf['title'])
+    
+    # train_meme_info_all = {"img_path": train_val_meme_info_all[:int(len(train_val_meme_info_all) * 0.8)],
+    #                        "ocr_text": train_val_meme_info_all[:int(len(train_val_meme_ocr_all) * 0.8)]}
+    # val_meme_info_all = {"img_path": train_val_meme_info_all[int(len(train_val_meme_info_all) * 0.8):], 
+    #                      "ocr_text": train_val_meme_info_all[int(len(train_val_meme_ocr_all) * 0.8):]}
+
+    # dataset = datasets.DatasetDict({"train": datasets.Dataset.from_dict(train_meme_info_all), 
+    #                                 "validation": datasets.Dataset.from_dict(val_meme_info_all), 
+    #                                 "test": datasets.Dataset.from_dict(test_meme_info_all)})
+    # Only the test set matters 
+    with open(test_memes_config_file, 'r', encoding='utf-8') as json_file:
+        test_memes_configs = json.load(json_file)
+    # Prepare img_dir and about_section
+    test_meme_info_all = {"img_path": [], 'ocr_text':[], "img_captions": []}
+    for conf in test_memes_configs:
+        test_meme_info_all["img_path"].append(memes_img_dir + conf['img_fname'])
+        test_meme_info_all["ocr_text"].append('None')
+        test_meme_info_all["img_captions"].append(" ".join(conf['img_captions']))
+
+    # Training and validation sets
+    with open(train_val_memes_config_file, 'r', encoding='utf-8') as json_file:
+        train_val_memes_configs = json.load(json_file)
+    # Prepare img_dir and about_section
+    train_val_meme_info_all = []
+    train_val_meme_ocr_all = []
+    train_val_meme_img_cap_all = []
+    for conf in train_val_memes_configs:
+        train_val_meme_info_all.append(memes_img_dir + conf['img_fname'])
+        train_val_meme_ocr_all.append('None')
+        train_val_meme_img_cap_all.append(" ".join(conf['img_captions']))
+    
+    train_meme_info_all = {"img_path": train_val_meme_info_all[:int(len(train_val_meme_info_all) * 0.8)],
+                           "ocr_text": train_val_meme_ocr_all[:int(len(train_val_meme_ocr_all) * 0.8)],
+                           "img_captions": train_val_meme_img_cap_all[:int(len(train_val_meme_img_cap_all) * 0.8)]}
+    val_meme_info_all = {"img_path": train_val_meme_info_all[int(len(train_val_meme_info_all) * 0.8):], 
+                         "ocr_text": train_val_meme_ocr_all[int(len(train_val_meme_ocr_all) * 0.8):],
+                         "img_captions": train_val_meme_img_cap_all[int(len(train_val_meme_img_cap_all) * 0.8):]}
+    
     dataset = datasets.DatasetDict({"train": datasets.Dataset.from_dict(train_meme_info_all), 
                                     "validation": datasets.Dataset.from_dict(val_meme_info_all), 
                                     "test": datasets.Dataset.from_dict(test_meme_info_all)})
@@ -253,6 +338,7 @@ def figmemes(args):
     with open(os.path.join(folder, "figmemes_ocrs.tsv"), "r", encoding="utf-8") as f:
         for row in tqdm(csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE), desc="Annotations"):
             all_features[row["img_name"]]["ocr_text"] = row["text"]
+    
     with open(os.path.join(folder, f"{args.split}_split.tsv"), "r", encoding="utf-8") as f:
         for row in tqdm(csv.DictReader(f, delimiter="\t"), desc="Annotations"):
             all_features[row["img_name"]]["split"] = row["split"]
@@ -260,16 +346,21 @@ def figmemes(args):
                 all_features[row["img_name"]]["year"] = row["year"]
             if "cluster" in row:
                 all_features[row["img_name"]]["cluster"] = row["cluster"]
-    # for feature_type in args.all_feature_type.split(","):
-    #     with h5py.File(os.path.join(folder, "features", f"all_{feature_type}.h5"), "r") as f:
-    #         for img_id in f.keys():
-    #             if img_id not in all_features:
-    #                 print(f"Image {img_id} does not exist in any split.")
-    #                 continue
-    #             all_features[img_id][f"{feature_type}_feature"] = f[f'{img_id}/features'][()]
-    #             all_features[img_id][f"img_h"] = f[f'{img_id}/img_h'][()]
-    #             all_features[img_id][f"img_w"] = f[f'{img_id}/img_w'][()]
-    #             all_features[img_id][f"{feature_type}_rect"] = f[f'{img_id}/boxes'][()]
+
+    with open(os.path.join(folder, "filtered_meme_configs_5_attributes_figmemes.json"), "r", encoding="utf-8") as f:
+        counter = 0
+        meme_annotation = json.load(f)
+        for key in all_features:
+            for anno in meme_annotation:
+                img_name = anno['image_dir'].split('/')[-1]
+                if key == img_name:
+                    all_features[img_name]["img_captions"] = anno["visual elaboration"]
+                    if all_features[img_name]['split'] == 'test':
+                        counter += 1
+                    break
+                else:
+                    all_features[key]["img_captions"] = 'None'
+    print('In total', counter)
     split_features = {"train": [], "validation": [], "test": []}
     for feature in all_features.values():
         split = feature.pop("split")
@@ -278,7 +369,6 @@ def figmemes(args):
         split_features[split] = {k: [f[k] for f in split_feature] for k in split_feature[0].keys()}
     dataset = datasets.DatasetDict({split: datasets.Dataset.from_dict(split_features[split]) for split in split_features})
         #dataset.save_to_disk(os.path.join(folder, "hf_dataset", args.split, args.all_feature_type))
-
     return LABEL_LIST, dataset
 
 def multioff(args):
