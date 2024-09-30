@@ -2,6 +2,12 @@ import argparse
 import json
 import os
 import pandas as pd
+import subprocess
+
+def get_gpu_info():
+    result = subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE)
+    print(result.stdout.decode())
+
 
 def load_meme_text_retrieval_dataset():
     '''

@@ -44,6 +44,11 @@ pip install -e .
 # please try running the command below (without #)
 # pip install flash-attn --no-build-isolation --no-cache-dir
 ```
+## Install CLIP
+```shell
+conda install --yes -c pytorch cudatoolkit=11.0
+pip install git+https://github.com/openai/CLIP.git
+```
 # Quick Start
 ## CLI inference for data annotation
 
