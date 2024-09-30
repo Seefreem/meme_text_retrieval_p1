@@ -86,6 +86,7 @@ def get_args_parser():
                         help='disable mixed-precision training (requires more memory and compute)')
 
     parser.add_argument('--print-freq', default=1, type=int, help='print frequency')
+    parser.add_argument('--test-freq', default=1, type=int, help='testing and validation frequency')
     parser.add_argument('-j', '--workers', default=10, type=int, metavar='N',
                         help='number of data loading workers per process')
     parser.add_argument('--distributed', default=False, type=bool,
@@ -192,8 +193,8 @@ def main(args):
     #         transforms.ToTensor(),
     #         normalize
     #     ])
-    train_transform = utils.transform(336)
-    val_transform = utils.transform(336)
+    train_transform = utils.transform(336, train=True)
+    val_transform = utils.transform(336, train=False)
     # val_dataset = datasets.ImageFolder(os.path.join(args.image_root, 'val'), transform=val_transform)
 
 
@@ -226,9 +227,11 @@ def main(args):
     print(args)
     print("=> test before training:")
     print('=> validation set: ')
-    print(validate(val_loader, model, tokenizer, args))
+    print(validate(val_loader, model, tokenizer, args, 
+                    -1, log_prefix = 'val/', log_writer=log_writer))
     print('=> test set: ')
-    print(validate(data['test'].dataloader, model, tokenizer, args))
+    print(validate(data['test'].dataloader, model, tokenizer, args, 
+                    -1, log_prefix = 'test/', log_writer=log_writer))
 
     print("=> beginning training")
     for epoch in range(args.start_epoch, args.epochs):
@@ -239,42 +242,29 @@ def main(args):
 
         # train for one epoch
         train_stats = train(train_loader, log_writer, model, criterion, optimizer, scaler, epoch, lr_schedule, args)
-        
-        print('=> validation: ')
-        val_stats = validate(val_loader, model, tokenizer, args)
-        print('=> test: ')
-        print(validate(data['test'].dataloader, model, tokenizer, args))
-        acc1 = val_stats['r@1']
+        assert args.epochs > args.test_freq
+        if epoch % args.test_freq == 0:
+            print('=> validation: ')
+            val_stats = validate(val_loader, model, tokenizer, args, 
+                                epoch, log_prefix = 'val/', log_writer=log_writer)
+            print('=> test: ')
+            print(validate(data['test'].dataloader, model, tokenizer, args, 
+                            epoch, log_prefix = 'test/', log_writer=log_writer))
+            acc1 = val_stats['r@1']
 
-        is_best = acc1 > best_r_at_1
-        best_r_at_1 = max(acc1, best_r_at_1)
-        print("=> saving checkpoint")
-        utils.save_on_master({
-                'epoch': epoch + 1,
-                'state_dict': model.state_dict(),
-                'optimizer' : optimizer.state_dict(),
-                'scaler': scaler.state_dict(),
-                'best_r_at_1': best_r_at_1,
-                'args': args,
-            }, is_best, args.output_dir)
+            is_best = acc1 > best_r_at_1
+            best_r_at_1 = max(acc1, best_r_at_1)
+            print("=> saving checkpoint")
+            utils.save_on_master({
+                    'epoch': epoch + 1,
+                    'state_dict': model.state_dict(),
+                    'optimizer' : optimizer.state_dict(),
+                    'scaler': scaler.state_dict(),
+                    'best_r_at_1': best_r_at_1,
+                    'args': args,
+                }, is_best, args.output_dir)
 
-        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                     **{f'val_{k}': v for k, v in val_stats.items()},
-                     'epoch': epoch}
-
-        # log test stats to log_writer (tensorboard)
-        if log_writer is not None:
-            for k, v in log_stats.items():
-                if k.startswith('test'):
-                    log_writer.add_scalar(k, v, epoch)
-
-        if utils.is_main_process():
-            with open(os.path.join(args.output_dir, 'log.txt'), 'a') as f:
-                f.write(json.dumps(log_stats) + '\n')
-    
     print("=> Training finished")
-    # print("Test the model after fine-tuning: ")
-    # print(validate(data['test'].dataloader, model, tokenizer, args))
 
 
 def train(train_loader, log_writer, model, criterion, optimizer, scaler, epoch, lr_schedule, args):
@@ -347,10 +337,10 @@ def train(train_loader, log_writer, model, criterion, optimizer, scaler, epoch, 
         # save to log_writer (tensorboard)
         if log_writer is not None:
             for k, v in loss_dict.items():
-                log_writer.add_scalar(k, v.item(), it)
-            log_writer.add_scalar('scaler', scaler.get_scale(), it)
-            log_writer.add_scalar('logit', logit_scale, it)
-            log_writer.add_scalar('lr', optimizer.param_groups[0]['lr'], it)
+                log_writer.add_scalar('train/' + k, v.item(), it)
+            log_writer.add_scalar('train/scaler', scaler.get_scale(), it)
+            log_writer.add_scalar('train/logit', logit_scale, it)
+            log_writer.add_scalar('train/lr', optimizer.param_groups[0]['lr'], it)
 
         if optim_iter % args.print_freq == 0:
             progress.display(optim_iter)
@@ -361,7 +351,7 @@ def train(train_loader, log_writer, model, criterion, optimizer, scaler, epoch, 
             'logit_scale': logit_scale}
 
 
-def validate(val_loader, model, tokenizer, args):
+def validate(val_loader, model, tokenizer, args, step, log_prefix = '', log_writer=None):
     batch_time = AverageMeter('Time', ':6.3f')
     T2I_top1 = AverageMeter('T2I R@1', ':6.2f')
     T2I_top5 = AverageMeter('T2I R@5', ':6.2f')
@@ -425,6 +415,10 @@ def validate(val_loader, model, tokenizer, args):
         I2T_top1.update(img2text_recall_at_k['i2t_r1'], 1)
         I2T_top5.update(img2text_recall_at_k['i2t_r5'], 1)
         I2T_top10.update(img2text_recall_at_k['i2t_r10'], 1)
+        for ite in img2text_recall_at_k:
+            log_writer.add_scalar(log_prefix + ite, img2text_recall_at_k[ite], step)
+        for ite in text2img_recall_at_k:
+            log_writer.add_scalar(log_prefix + ite, text2img_recall_at_k[ite], step)
 
         # measure elapsed time
         batch_time.update(time.time() - end)

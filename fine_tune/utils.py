@@ -5,7 +5,7 @@ import torch
 import subprocess
 import torch.distributed as dist
 from PIL import Image
-from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
+from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize, RandomResizedCrop
 from models import MyCLIP
 try:
     from torchvision.transforms import InterpolationMode
@@ -20,14 +20,23 @@ def get_gpu_info():
 def convert_image_to_rgb(image):
     return image.convert("RGB")
 
-def transform(n_px):
-    return Compose([
-        Resize(n_px, interpolation=BICUBIC),
-        CenterCrop(n_px),
-        convert_image_to_rgb,
-        ToTensor(),
-        Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
-    ])
+def transform(n_px, train=True):
+    if train:
+        return Compose([
+            Resize(n_px, interpolation=BICUBIC),
+            RandomResizedCrop(n_px, scale=(0.8, 1.0)),
+            convert_image_to_rgb,
+            ToTensor(),
+            Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        ])
+    else:
+        return Compose([
+            Resize(n_px, interpolation=BICUBIC),
+            CenterCrop(n_px),
+            convert_image_to_rgb,
+            ToTensor(),
+            Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        ])
 
 
 def accuracy(output, target, topk=(1,)):
