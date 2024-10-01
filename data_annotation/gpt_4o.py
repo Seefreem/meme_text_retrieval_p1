@@ -60,7 +60,7 @@ def call_api(image_paths: list[str], prompt=None, api_key=None):
 
 
 def main(args):
-  f = open('./config/openai_api_key.json')
+  f = open('../config/openai_api_key.json')
   conf = json.load(f)
   f.close()
   # OpenAI API Key
@@ -116,13 +116,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.few_shot_with_example_images and args.dataset == "figmemes":
-      args.example_images = ['./data/figmemes/images/1483414267738.jpg', 
-                            './data/figmemes/images/1484978535453.jpg', 
-                            './data/figmemes/images/1483781574074.png']
+      args.example_images = ['../data/figmemes/images/1483414267738.jpg', 
+                            '../data/figmemes/images/1484978535453.jpg', 
+                            '../data/figmemes/images/1483781574074.png']
     elif args.few_shot_with_example_images and args.dataset == "memecap":
-      args.example_images = ['./data/memecap/memes/memes/memes_eiide7.png', 
-                            './data/memecap/memes/memes/memes_eimmhx.png', 
-                            './data/memecap/memes/memes/memes_ynm613.png']
+      args.example_images = ['../data/memecap/memes/memes/memes_eiide7.png', 
+                            '../data/memecap/memes/memes/memes_eimmhx.png', 
+                            '../data/memecap/memes/memes/memes_ynm613.png']
     print(args.example_images)
     main(args)
 

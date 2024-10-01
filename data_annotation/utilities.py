@@ -17,9 +17,9 @@ def load_meme_text_retrieval_dataset():
         'about_section': '.'
     }
     '''
-    memes_config_file = './data/meme_retrieval_data/final_processed_config_file.json'
-    meme_template_info_file = './data/50_template_info.json'
-    memes_img_dir = './data/meme_retrieval_data/dataset/data_unique_title_engaging/'
+    memes_config_file = '../data/meme_retrieval_data/final_processed_config_file.json'
+    meme_template_info_file = '../data/50_template_info.json'
+    memes_img_dir = '../data/meme_retrieval_data/dataset/meme_images/'
 
     with open(memes_config_file, 'r', encoding='utf-8') as json_file:
         final_processed_config_file = json.load(json_file)
@@ -34,9 +34,10 @@ def load_meme_text_retrieval_dataset():
         meme_name = i['url'].split("/")[-1].split(".json")[0]
         meme_type = i['type']
         meme_info = {"img_dir": memes_img_dir + meme_name,
-                    "about_section":template_info_50[i['type']]['about']}
+                    "about_section":template_info_50[i['type']]['about'],
+                    'ocr': " ".join(i['boxes'])}
         meme_info_all.append(meme_info)
-    print('Example: ', meme_info_all[0])
+    print('Example: ', meme_info_all[0], 'Number:', len(meme_info_all))
     return meme_info_all
 
 def load_memecap_dataset():
@@ -52,8 +53,8 @@ def load_memecap_dataset():
     
     '''
     # memes_config_file = './data/memecap/meme-cap-main/data/memes-test.json'
-    memes_config_file = './data/memecap/meme-cap-main/data/memes-few-shot-with-example-images.json'
-    memes_img_dir = './data/memecap/memes/memes/'
+    memes_config_file = '../data/memecap/meme-cap-main/data/memes-few-shot-with-example-images.json'
+    memes_img_dir = '../data/memecap/memes/memes/'
 
     with open(memes_config_file, 'r', encoding='utf-8') as json_file:
         memes_configs = json.load(json_file)
@@ -78,10 +79,10 @@ def load_figmeme_dataset():
     }
     '''
     # Simple Way to Read TSV Files in Python using pandas
-    # standard_spit = pd.read_csv('./data/figmemes/standard_split.tsv', sep='\t')
-    # standard_spit = pd.read_csv('./data/figmemes/template_based_memes.tsv', sep='\t')
-    standard_spit = pd.read_csv('./data/figmemes/cot_samples.tsv', sep='\t')
-    ocrs = pd.read_csv('./data/figmemes/figmemes_ocrs.tsv', sep='\t', index_col=0)
+    # standard_spit = pd.read_csv('../data/figmemes/standard_split.tsv', sep='\t')
+    # standard_spit = pd.read_csv('../data/figmemes/template_based_memes.tsv', sep='\t')
+    standard_spit = pd.read_csv('../data/figmemes/template_based_instances_test_split.tsv', sep='\t')
+    ocrs = pd.read_csv('../data/figmemes/figmemes_ocrs.tsv', sep='\t', index_col=0)
     
     
     # Select rows where any column contains the keyword "test"
@@ -90,13 +91,13 @@ def load_figmeme_dataset():
     print(standard_spit.columns)
     if 'about_section' in standard_spit.columns:
         print('1')
-        testset = [ {'img_dir':  './data/figmemes/images/' + ite[0], 
+        testset = [ {'img_dir':  '../data/figmemes/images/' + ite[0], 
                      'about_section': ite[2], 
                      'ocr': str(ocrs.loc[ite[0], 'text'])} 
                      for ite in testset]
     else:
         print('2')
-        testset = [ {'img_dir':  './data/figmemes/images/' + ite[0], 
+        testset = [ {'img_dir':  '../data/figmemes/images/' + ite[0], 
                      'about_section': '',
                      'ocr': str(ocrs.loc[ite[0], 'text'])} 
                      for ite in testset]
@@ -126,6 +127,7 @@ def prepare_prompts(dataset, model=None):
     for meme_info in meme_info_all:
         # filter out nonexistent images
         if not os.path.exists(meme_info['img_dir']):
+            print(meme_info['img_dir'], 'not exist!!!')
             continue
         about = meme_info['about_section']
         ocr = meme_info['ocr']
@@ -178,6 +180,9 @@ def prepare_prompts(dataset, model=None):
             inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':'\n "You are a masterful assistant in interpretation of online memes, their style of literary devices, their meaning and humour.."\n \n <The list of choices and the definitions of literary devices>: \n **Allusion**: Referencing historical events, figures, symbols, art, literature or pop culture.\n **Exaggeration**: Similar to Hyperbole. Use of exaggerated terms for emphasis, including exaggerated visuals (including unrealistic features portraying minorities).\n **Irony**: Similar to Sarcasm. Use of words that convey a meaning that is the opposite of its usual meaning/mock someone or something with caustic or bitter use of words.\n **Anthropomorphism**: Similar to Zoomorphism. Attributing human qualities to animals, objects, natural phenomena or abstract concepts or applying animal characteristics to humans in a way that conveys additional meaning. \n **Metaphor**: Similar to Simile. Implicit or explicit comparisons between two items or groups, attributing the properties of one thing to another. This category includes dehumanizing metaphors. \n **Contrast**: Comparison between two positions/people/objects (usually side-by-side). \n \n "<Multiple Choice> Please select one or multiple labels from the above list that are applied to the meme:"\n Your answer:\n \n "<Extraction of answer> Extract the suitable labels for the input meme and the multiple choice question above:"\n Your answer:\n \n "<Choice by choice comparison> Compare each label with the meme and decide if this label could explain the meme:"\n Your answer:\n \n \"Finally output your answer in the format:\"\n {\n "literary device":["allusion", ...]\n }'})
         elif 'gpt-4o-figmemes-cot-3-step-critical' == model:
             inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':'\n "You are a masterful, strict and critical assistant in interpretation of online memes, their style of literary devices, their meaning and humour.."\n \n <The list of choices and the definitions of literary devices>: \n **Allusion**: Referencing historical events, figures, symbols, art, literature or pop culture.\n **Exaggeration**: Similar to Hyperbole. Use of exaggerated terms for emphasis, including exaggerated visuals (including unrealistic features portraying minorities).\n **Irony**: Similar to Sarcasm. Use of words that convey a meaning that is the opposite of its usual meaning/mock someone or something with caustic or bitter use of words.\n **Anthropomorphism**: Similar to Zoomorphism. Attributing human qualities to animals, objects, natural phenomena or abstract concepts or applying animal characteristics to humans in a way that conveys additional meaning. \n **Metaphor**: Similar to Simile. Implicit or explicit comparisons between two items or groups, attributing the properties of one thing to another. This category includes dehumanizing metaphors. \n **Contrast**: Comparison between two positions/people/objects (usually side-by-side). \n \n "<Multiple Choice> Please select one or multiple labels from the above list that are applied to the meme:"\n Your answer:\n \n "<Extraction of answer> Extract the suitable labels for the input meme and the multiple choice question above:"\n Your answer:\n \n "<Choice by choice comparison> Compare each of the exacted labels with the meme and decide if this label could explain the meme:"\n Your answer:\n \n <Final labels>:\n {\n "literary device":["allusion", ...]\n }'})
+        elif 'gpt-4o-figmemes-cot-3-step-27' == model:
+            inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':'\n"You are a masterful assistant in the interpretation of online memes, their style of literary devices, their meaning and humour.."\n\n<About the meme template>:\n{'+
+                                    about + '}\n\n<The list of literary devices>: \nsarcasm, irony, allegory, alliteration, allusion, amplification, anagram, analogy, anthropomorphism, antithesis, chiasmus, circumlocution, euphemism, exaggeration, imagery, metaphor, onomatopoeia, oxymoron, paradox, personification, portmanteau, pun, satire, simile, symbolism and contrast.\n\n"<Multiple Choice> Please select no more than three most significant labels from the above list that are applied to the meme, and explain why:"\nYour answer:\n\n"<Extraction of answer> Extract only the labels for the multiple choice question above:"\nYour answer:\n\n"<Choice by choice comparison> Compare each label with the meme and decide if this label could explain the meme:"\nYour answer:\n\n"<Final output> select the correct labels from the above comparison and output in the format:"\n{\n"literary device":["allusion", ...]\n}'})
         
         elif 'gpt-4o-figmemes-with-examples-of-labels' == model:
             inputs_template.append({'image_dir':meme_info['img_dir'], 'prompt':'\nTask: \nYou are going to analyse the literary devices of a meme, and choose suitable literary devices from the given candidates;\nYou need to compare the given meme to these examples.\nLiterary devices: \n**Allusion**: Referencing historical events, figures, symbols, art, literature or pop culture.\n \nExample of allusion: This meme features an edited image of Donald Trump, portraying him in a dramatic pose holding two guns, similar to a movie poster. The text reads "TRUMP: He is come to clean America," suggesting a tough, action-hero persona. The "COMING SOON 2016" refers to the year Donald Trump ran for and won the U.S. presidential election.\n\n**Exaggeration**: Similar to Hyperbole. Use of exaggerated terms for emphasis, including exaggerated visuals (including unrealistic features portraying minorities).\n \nExample of exaggeration:\nThe meme humorously portrays Madagascar\'s extreme response with exaggerated urgency. When informed that "a man in Brazil is coughing," the fictional President of Madagascar immediately decides to "SHUT DOWN EVERYTHING." \n\n**Irony**: Similar to Sarcasm. Use of words that convey a meaning that is the opposite of its usual meaning/mock someone or something with caustic or bitter use of words.\n  \nExample of irony:\nThis meme features a depiction of a soldier riding on a tank, shouting, "DRIVE ME CLOSER! I want to hit them with my sword!" The absurdity lies in the juxtaposition of the soldier\'s desire to engage in close combat with a sword while being on a powerful war machine designed for long-range artillery combat.\n\n**Anthropomorphism**: Similar to Zoomorphism. Attributing human qualities to animals, objects, natural phenomena or abstract concepts or applying animal characteristics to humans in a way that conveys additional meaning. \n \nExample of anthropomorphism:\nThis meme illustrates a group of sheep standing in line to vote, with the two candidates depicted as a wolf and a lion, both wearing suits. The sheep, representing the voters, are shown making a choice between these two predatory animals.\n\n**Metaphor**: Similar to Simile. Implicit or explicit comparisons between two items or groups, attributing the properties of one thing to another. This category includes dehumanizing metaphors. \n \nExample of metaphor:\nThis meme shows a person with a simplified, emotionless face edited onto them, with the caption on the left reading:"ERROR: LOGIC.EXE NOT FOUND\n RUNNING: EMOTION.EXE". The ".exe" file format used in the text is a reference to computer executable files, which suggests that the poster is acting like a computer.\n\n**Contrast**: Comparison between two positions/people/objects (usually side-by-side).\nExample of contrast:\nThe top left image shows a perfect example of fried eggs cooked in a skull-shaped mold. The top right image shows the skull-shaped mold and two eggs before cooking, suggesting that this is the intended outcome. However, the bottom image shows the reality: a messy, overcooked version where the eggs have lost their shape.\n\n**None**: No literary devices are applied to the meme.\nExample of none:\nThis meme features a character with a serious demeanor and straightforward manner of speaking. The text in the meme reads: "You are pretty high and far out, aren\'t ya? What kind of kick are you on, son?"\n\nNow, analyse the given meme.\n\nFollow the JSON format: \n{\n"literary device": ["word 1", …],\n"explaination": ""\n}'})
