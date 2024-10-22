@@ -5,6 +5,7 @@ import math
 import os
 import sys
 import time
+import pprint
 from torch.utils.tensorboard import SummaryWriter
 
 import numpy as np
@@ -19,6 +20,11 @@ import torch.utils.data.distributed
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
+import ray
+from ray import tune
+from ray.tune.search import ConcurrencyLimiter
+from ray.tune.search.bayesopt import BayesOptSearch
+import ray.train as ray_train
 
 from data import get_data
 from tokenizer import SimpleTokenizer
@@ -33,49 +39,50 @@ def get_args_parser():
     parser.add_argument(
         "--train-data",
         type=str,
-        default='../data/meme_retrieval_data/training_set.json',
+        default='/data/meme_retrieval_data/training_set.json',
         help="Path to training data.",
     )
     parser.add_argument(
         '--val-data',
         type=str,
-        default='../data/meme_retrieval_data/validation_set.json',
+        default='/data/meme_retrieval_data/validation_set.json',
         help='Path to validation data.'
     )
     parser.add_argument(
         '--test-data',
         type=str,
-        default='../data/memecap/meme-cap-main/data/memes-test.json',
+        default='/data/memecap/meme-cap-main/data/memes-test.json',
         help='Path to test data.'
     )
     parser.add_argument(
         '--root',
         type=str,
-        default='../data/',
+        default='/home/bjc154/meme_text_retrieval_p1',
         help='Root directory of images.'
     )
+    parser.add_argument('--sweep', default=False, type=bool)
     # candidates: ['merge', 'extend', 'first']
     parser.add_argument('--caption-preprocess', default='first', type=str)
     # list of filenames for augmented captions
     # parser.add_argument('--augmented_caption_filelist', nargs='+', help='list of augmented caption filenames, seperated by space')
     # parser.add_argument('--aug-text', action='store_true', help='set to True for LaCLIP')
 
-    parser.add_argument('--image-root', default='../data/meme_retrieval_data/meme_images', 
+    parser.add_argument('--image-root', default='/home/bjc154/meme_text_retrieval_p1/data/meme_retrieval_data/meme_images', 
                         type=str, help='path to image dataset')
     parser.add_argument('--output-dir', default='./output', type=str, help='output dir')
 
     parser.add_argument('--model', default='CLIP_VITL14_336', type=str)
     parser.add_argument('--resume', default='', type=str, help='path to resume from')
 
-    parser.add_argument('--epochs', default=10, type=int)
+    parser.add_argument('--epochs', default=20, type=int)
     parser.add_argument('--warmup-epochs', default=1, type=int) # Or steps?
     parser.add_argument('--start-epoch', default=0, type=int)
     parser.add_argument('--batch-size', default=16, type=int,
                         help='number of samples per-gpu') # To be decided
-    parser.add_argument('--lr', default=2e-5, type=float)
+    parser.add_argument('--lr', default=1e-5, type=float)
     parser.add_argument('--lr-start', default=1e-6, type=float,
                         help='initial warmup lr')
-    parser.add_argument('--lr-end', default=1e-5, type=float,
+    parser.add_argument('--lr-end', default=1e-6, type=float,
                         help='minimum final lr')
     parser.add_argument('--update-freq', default=150, type=int,
                         help='optimizer update frequency (i.e. gradient accumulation steps)')
@@ -108,8 +115,8 @@ best_r_at_1 = 0
 
 
 def main(args):
+    pprint.pp(args.__dict__)
     utils.init_distributed_mode(args)
-
     global best_r_at_1
 
     # fix the seed for reproducibility
@@ -175,7 +182,10 @@ def main(args):
             print("=> loaded latest checkpoint '{}' (epoch {})"
                   .format(latest, latest_checkpoint['epoch']))
 
-    cudnn.benchmark = True
+    # When benchmark is set, it usually leads to faster runtime.
+    # But it will cause failure in Ray Tune  
+    if not args.sweep:
+        cudnn.benchmark = True
 
     # Data loading code
     print("=> creating dataset")
@@ -248,22 +258,24 @@ def main(args):
             val_stats = validate(val_loader, model, tokenizer, args, 
                                 epoch, log_prefix = 'val/', log_writer=log_writer)
             print('=> test: ')
-            print(validate(data['test'].dataloader, model, tokenizer, args, 
-                            epoch, log_prefix = 'test/', log_writer=log_writer))
-            acc1 = val_stats['r@1']
-
-            is_best = acc1 > best_r_at_1
-            best_r_at_1 = max(acc1, best_r_at_1)
-            print("=> saving checkpoint")
-            utils.save_on_master({
-                    'epoch': epoch + 1,
-                    'state_dict': model.state_dict(),
-                    'optimizer' : optimizer.state_dict(),
-                    'scaler': scaler.state_dict(),
-                    'best_r_at_1': best_r_at_1,
-                    'args': args,
-                }, is_best, args.output_dir)
-
+            test_score = validate(data['test'].dataloader, model, tokenizer, args, 
+                                  epoch, log_prefix = 'test/', log_writer=log_writer)
+            print(test_score)
+            acc1 = test_score['r@1'] # val_stats['r@1']
+            if args.sweep:
+                ray_train.report({"epoch": epoch, "r@1": test_score['r@1']})
+            else:
+                is_best = acc1 > best_r_at_1
+                best_r_at_1 = max(acc1, best_r_at_1)
+                print("=> saving checkpoint")
+                utils.save_on_master({
+                        'epoch': epoch + 1,
+                        'state_dict': model.state_dict(),
+                        'optimizer' : optimizer.state_dict(),
+                        'scaler': scaler.state_dict(),
+                        'best_r_at_1': best_r_at_1,
+                        'args': args,
+                    }, is_best, args.output_dir)
     print("=> Training finished")
 
 
@@ -431,11 +443,40 @@ def validate(val_loader, model, tokenizer, args, step, log_prefix = '', log_writ
     progress.synchronize()
     print('The mean img2text R@K: {}; The mean text2img R@K: {}'
           .format(img2text_recall_at_k['i2t_r_mean'], text2img_recall_at_k['t2i_r_mean']))
-    return {'r@1': (img2text_recall_at_k['i2t_r_mean'] + text2img_recall_at_k['t2i_r_mean']) / 2}
+    return {'r@1': (img2text_recall_at_k['i2t_r1'] + text2img_recall_at_k['t2i_r1']) / 2}
 
+def sweep_func(config=None):
+    args.lr = config['lr']
+    args.update_freq = int(config['update-freq'])
+    args.warmup_epochs = int(config['warming_up'])
+    args.epochs = int(config['epochs'])
+    main(args)
+    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Meme_Text_Retrieval_CLIP training', parents=[get_args_parser()])
     args = parser.parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
-    main(args)
+    if args.sweep:
+        algo = BayesOptSearch(utility_kwargs={"kind": "ucb", "kappa": 2.5, "xi": 0.0}, 
+                              metric='r@1', mode='max')
+        algo = ConcurrencyLimiter(algo, max_concurrent=1)
+        search_space = {
+            "lr": tune.loguniform(1e-6, 4e-5),
+            "update-freq": tune.uniform(32, 128),
+            "warming_up": tune.uniform(1, 5),
+            "epochs": tune.uniform(10, 26)
+        }
+        result = tune.run(
+            sweep_func,
+            resources_per_trial={"cpu": 64, "gpu": 1},
+            config=search_space,
+            num_samples=15,
+            search_alg=algo)
+        print('=> The results of hyperparameter tuning')
+        print(result.dataframe())
+        print(result.get_best_config('r@1', 'max'))
+        print()
+
+    else:
+        main(args)

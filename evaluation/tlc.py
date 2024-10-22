@@ -207,6 +207,7 @@ class TemplateLabelCounter(object):
             for line in tqdm(f):
                 template_info = dict(json.loads(line))
                 # self.info.append(template_info)
+                number_of_loaded_images = 0
                 for template in template_info.keys():
                     template = template_info[template]
                     file_path = ''
@@ -361,15 +362,17 @@ class TemplateLabelCounter(object):
     def ds_to_embeddings(self, ds):
         print(inspect.currentframe().f_code.co_name)
         dank_memes = []
+        number_of_loaded_images = 0
         for dank_meme in tqdm(ds['img_path']):
             try:        
                 dank_meme = self.preprocess(PIL.Image.open(dank_meme))
+                number_of_loaded_images += 1
             except FileNotFoundError:
                 dank_meme = 'data/' + dank_meme
                 dank_meme = self.preprocess(PIL.Image.open(dank_meme))
 
             dank_memes.append(dank_meme)
-        
+        print(f'The number_of_loaded_images for meme instances: {number_of_loaded_images}')
         embeddings = self.clip_features(dank_memes)        
         return embeddings
     
