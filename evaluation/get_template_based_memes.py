@@ -46,8 +46,7 @@ print("dataset[1]['test'][0]", dataset[1]['test'][:3])
 
 args.feature = 'pixel'
 if not args.need_to_read:
-    model, preprocess = clip.load('ViT-L/14')
-    # model, preprocess = clip.load('../model/ViT-L-14-336px.pt')
+    model, preprocess = clip.load('../model/ViT-L-14-336px.pt')
     model.cuda().eval()
     # print(model)
     print(preprocess)

@@ -4,15 +4,16 @@ Project title: Meme-text retrieval: a new dataset and a cross-model embedder
 Main supervisor: Serge Belongie   
 Co-supervisor: Peter Ebert Christensen  
 
+# Dataset
+The proposed dataset is split into **training_set.json** and **validation_set.json**. There is a link towards each meme. 
+
 # Models
-
-## [LlaVA](https://github.com/haotian-liu/LLaVA)
-
+We utilized **CLIP** and **LlaVA-1.6** for our experiments. Please refer to their original repositories for details.  
 # Environment
 
 ## Install
 
-If you are not using Linux, do *NOT* proceed.
+The following instructions are for Linux users.
 
 1. Clone this repository and navigate to meme_text_retrieval_p1 folder
 ```bash
@@ -20,7 +21,7 @@ git clone https://github.com/Seefreem/meme_text_retrieval_p1.git
 cd meme_text_retrieval_p1
 ```
 
-2. Install Package
+2. Install Packages
 ```Shell
 conda create -n meme_text python=3.10 -y
 conda activate meme_text
@@ -34,43 +35,34 @@ pip install -e ".[train]"
 pip install flash-attn --no-build-isolation
 ```
 
-### Upgrade to latest code base
-
-```Shell
-git pull
-pip install -e .
-
-# if you see some import errors when you upgrade,
-# please try running the command below (without #)
-# pip install flash-attn --no-build-isolation --no-cache-dir
-```
-## Install CLIP
-```shell
-conda install --yes -c pytorch cudatoolkit=11.0
-pip install git+https://github.com/openai/CLIP.git
-```
 # Quick Start
-## CLI inference for data annotation
-
+## Data Annotation
+Run the following command for data annotation:
 ```Shell
-python data_annotation.llava_v1.6_7b.py
+conda activate meme_text
+cd data_annotation
+python gpt_4o.py --start-id 0  --dataset meme_text_retrieval --prompt-type gpt-4o-all-data
 ```
+When you have the responses from GPT-4o, you may use **post_processing.ipynb** to extract features and check the validity.   
+Usually, there will be some missing information. We recommend you filter them out and do annotation again.
 
-## GPT-4o for data annotation
-```shell
-python -m  data_annotation.gpt_4o --start-id 1  --file-length 500 
-```
 
-## CLI Inference
-
-Chat about images using LLaVA without the need of Gradio interface. It also supports multiple GPUs, 4-bit and 8-bit quantized inference. With 4-bit quantization, for our LLaVA-1.5-7B, it uses less than 8GB VRAM on a single GPU.
-
+## Get Templatic Memes from Figmemes and MemeCap
+Run the following command for filtering out templatic memes:
 ```Shell
-python -m llava.serve.cli \
-    --model-path liuhaotian/llava-v1.5-7b \
-    --image-file "https://llava-vl.github.io/static/images/view.jpg" \
-    --load-4bit
+cd evaluation
+python get_template_based_memes.py --dataset figmemes 
 ```
+After filtering, the code will generate a HTML file for visualizing the paired templates and instances.
 
-
+## Fine-tuning CLIP
+Run the following command to fine-tune CLIP, without hyperparameter searching (you may set "sweep" as True to enable hyperparameter optimization):
+```Shell
+cd fine_tune
+python fine_tune_clip.py --epochs 20 --warmup-epochs 1 --sweep False 
+```
+Run the following command to test fine-tuned CLIP on your target dataset:
+```Shell
+python retrieval_test.py --test-data "the json file of your dataset" --root 'root directory of images' --text_type meme_captions  
+```
 
