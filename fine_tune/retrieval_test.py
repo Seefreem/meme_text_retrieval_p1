@@ -36,7 +36,7 @@ def get_args_parser():
     parser.add_argument('--caption-preprocess', default='first', type=str)
     parser.add_argument('--image-root', default='/home/bjc154/meme_text_retrieval_p1/data/meme_retrieval_data/meme_images', 
                         type=str, help='path to image dataset')
-    parser.add_argument('--output-dir', default='./output/tb_logs/18.10.2024_EP20_lr_1e-5/', type=str, help='output dir')
+    parser.add_argument('--model-dir', default='./output/tb_logs/18.10.2024_EP20_lr_1e-5/', type=str, help='checkpoint dir')
     parser.add_argument('--checkpoint', default='checkpoint_best.pt', type=str)
     parser.add_argument('--text_type', default='ocr', type=str) # img_captions, meme_captions, title, OCR 
 
