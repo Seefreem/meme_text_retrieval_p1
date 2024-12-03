@@ -58,7 +58,7 @@ class MemecapDataset(Dataset):
         return images, texts
 
 class MemeConfigDataset(Dataset):
-    def __init__(self, input_filename, transforms, tokenizer=None, root=None):
+    def __init__(self, input_filename, transforms, text_type='meaning of the meme', tokenizer=None, root=None):
         logging.debug(f'Loading meme configs data from {input_filename}.')
         self.images = []
         self.meme_captions = []
@@ -68,11 +68,14 @@ class MemeConfigDataset(Dataset):
             memes_configs = json.load(json_file)
             for conf in tqdm(memes_configs):
                 image = root + conf['image_dir'].split("..")[1]
-                meme_cap = conf['meaning of the meme']
+                meme_cap = conf[text_type]
                 if image.endswith(('.png', '.jpg', '.jpeg')):
                     self.images.append(image)
                     self.meme_captions.append(meme_cap)
         self.transforms = transforms
+        print("Text examples:")
+        print(self.meme_captions[0])
+        print(self.meme_captions[1])
         logging.debug('Done loading data.')
 
         self.tokenizer = tokenizer

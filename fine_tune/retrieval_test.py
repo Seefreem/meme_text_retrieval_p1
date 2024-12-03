@@ -12,7 +12,7 @@ import torch.utils.data
 import torch.utils.data.distributed
 
 
-from data import MemecapDataset, get_dataset
+from data import MemecapDataset, get_dataset, MemeConfigDataset
 from tokenizer import SimpleTokenizer
 import models
 import utils
@@ -24,7 +24,7 @@ def get_args_parser():
     parser.add_argument(
         '--test-data',
         type=str,
-        default='/data/memecap/meme-cap-main/data/memes-test-ocr.json',
+        default='/data/meme_retrieval_data/validation_set.json',
         help='Path to test data.'
     )
     parser.add_argument(
@@ -76,17 +76,24 @@ def main(args):
     else:
         model = getattr(models, args.model)()
     model.cuda(args.gpu)
-    val_transform = utils.transform(336)
+    val_transform = utils.transform(336, train=False)
     cudnn.benchmark = True
     # Data loading code
     print("=> creating dataset")
     tokenizer = SimpleTokenizer()
     
-    test_dataset = MemecapDataset(
+    # test_dataset = MemecapDataset(
+    #     args.test_data,
+    #     val_transform,
+    #     text_type=args.text_type,
+    #     caption_preprocess = args.caption_preprocess,
+    #     root=args.root,
+    #     tokenizer=tokenizer
+    # )
+    test_dataset = MemeConfigDataset(
         args.test_data,
         val_transform,
         text_type=args.text_type,
-        caption_preprocess = args.caption_preprocess,
         root=args.root,
         tokenizer=tokenizer
     )
