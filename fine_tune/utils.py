@@ -55,7 +55,7 @@ def accuracy(output, target, topk=(1,)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
-def recall_at_k(score_matrix, prefix = 't2i_'):
+def recall_at_k(score_matrix, prefix = 't2i_', file_names=None):
     '''
     Calculating the final R@K scores for image-text retrieval or text-image retrieval.
     The row elements are taken as queries.
@@ -70,6 +70,15 @@ def recall_at_k(score_matrix, prefix = 't2i_'):
     m_shape = score_matrix.shape
     # top 10 image indexes
     _, rank_txt_idx = score_matrix.topk(10, dim=1)
+    print('rank_txt_idx.shape', rank_txt_idx.shape)
+    retrieved_files = []
+    if not file_names == None:
+        for row in range(rank_txt_idx.shape[0]):
+            files_for_the_text = []
+            for column in range(rank_txt_idx.shape[1]):
+                files_for_the_text.append(file_names[rank_txt_idx[row, column]])
+            retrieved_files.append(files_for_the_text)
+
     # ground truth of image indexes, each row gets extended
     gt_img_j = torch.LongTensor([i for i in range(m_shape[0])]).unsqueeze(1).expand_as(rank_txt_idx)
     # non-zero element indexes
@@ -88,7 +97,7 @@ def recall_at_k(score_matrix, prefix = 't2i_'):
                 prefix+'r10': r10,
                 prefix+'r_mean': r_mean
                 }
-    return eval_log
+    return eval_log, retrieved_files
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -267,3 +276,79 @@ def cosine_scheduler(base_value, final_value, epochs, niter_per_ep, warmup_epoch
     schedule = np.concatenate((warmup_schedule, schedule))
     assert len(schedule) == epochs * niter_per_ep + 1
     return schedule
+
+
+def visualize_retrieved_memes(retrieved_files, query_texts, target_images, output_file="output.html"):
+    '''
+    Given the file names of retrieved images and the query texts, visualize the results.
+    
+    Parameters:
+      retrieved_files: list of lists; each element is a list of 5 image filename strings.
+      query_texts: list of strings; each element is the query text for a row.
+      target_images: list of strings; each element is a target image filename string.
+      output_file: name of the output HTML file (default "output.html")
+    
+    The output HTML file will contain a table with the following columns:
+       - Query text
+       - Target image
+       - Retrieved image 1
+       - Retrieved image 2
+       - Retrieved image 3
+       - Retrieved image 4
+       - Retrieved image 5
+       
+    For the target and retrieved images, the base file name is displayed below the image.
+    '''
+    # Start the HTML string
+    html_str = """
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Visualization of Retrieved Memes</title>
+        <style>
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+          img { max-width: 150px; height: auto; display: block; margin: 0 auto; }
+          .filename { font-size: 0.9em; color: #555; }
+        </style>
+      </head>
+      <body>
+        <h2>Visualization of Retrieved Memes</h2>
+        <table>
+          <tr>
+            <th>Query text</th>
+            <th>Target image</th>
+            <th>Retrieved image 1</th>
+            <th>Retrieved image 2</th>
+            <th>Retrieved image 3</th>
+            <th>Retrieved image 4</th>
+            <th>Retrieved image 5</th>
+          </tr>
+    """
+
+    # Loop over each row of data (assuming lengths match)
+    for query, target, retrieved in zip(query_texts, target_images, retrieved_files):
+        # print(query, target, retrieved)
+        html_str += "<tr>"
+        # Query text cell
+        html_str += f"<td>{query}</td>"
+        # Target image cell with image and base filename below
+        target_base = os.path.basename(target)
+        html_str += f"<td><img src='{target}' alt='Target Image'><div class='filename'>{target_base}</div></td>"
+        # For each of the 5 retrieved images
+        for img in retrieved:
+            img_base = os.path.basename(img)
+            html_str += f"<td><img src='{img}' alt='Retrieved Image'><div class='filename'>{img_base}</div></td>"
+        html_str += "</tr>"
+
+    # Close table and HTML
+    html_str += """
+        </table>
+      </body>
+    </html>
+    """
+
+    # Write the HTML string to a file
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(html_str)
+    print(f"HTML file created: {output_file}")

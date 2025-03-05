@@ -12,13 +12,13 @@ import torch.utils.data
 import torch.utils.data.distributed
 
 
-from data import MemecapDataset, get_dataset, MemeConfigDataset
+from data import MemecapDataset, get_dataset, MemeConfigDataset, FigmemesDataset
 from tokenizer import SimpleTokenizer
 import models
 import utils
-from utils import AverageMeter, ProgressMeter, recall_at_k, get_gpu_info
+from utils import AverageMeter, ProgressMeter, recall_at_k, get_gpu_info, visualize_retrieved_memes
 from clip import clip
-
+from tqdm import tqdm
 def get_args_parser():
     parser = argparse.ArgumentParser(description='Meme_Text_Retrieval_CLIP testing', add_help=False, )
     parser.add_argument(
@@ -33,7 +33,8 @@ def get_args_parser():
         default='/home/bjc154/meme_text_retrieval_p1',
         help='Root directory of images.'
     )
-    parser.add_argument('--caption-preprocess', default='first', type=str)
+    parser.add_argument('--caption-preprocess', default='first', type=str) # first, merge, extend
+    # # '../data/figmemes/images/'
     parser.add_argument('--image-root', default='/home/bjc154/meme_text_retrieval_p1/data/meme_retrieval_data/meme_images', 
                         type=str, help='path to image dataset')
     parser.add_argument('--model-dir', default='./output/tb_logs/18.10.2024_EP20_lr_1e-5/', type=str, help='checkpoint dir')
@@ -62,7 +63,7 @@ def main(args):
     # val_transform = utils.transform(224)
     
     # auto-resume from latest checkpoint in output directory
-    latest = os.path.join(args.output_dir, args.checkpoint)
+    latest = os.path.join(args.model_dir, args.checkpoint)
     if os.path.isfile(latest):
         print("=> loading latest checkpoint '{}'".format(latest))
         model = getattr(models, args.model)()
@@ -81,22 +82,33 @@ def main(args):
     # Data loading code
     print("=> creating dataset")
     tokenizer = SimpleTokenizer()
-    
-    # test_dataset = MemecapDataset(
-    #     args.test_data,
-    #     val_transform,
-    #     text_type=args.text_type,
-    #     caption_preprocess = args.caption_preprocess,
-    #     root=args.root,
-    #     tokenizer=tokenizer
-    # )
-    test_dataset = MemeConfigDataset(
-        args.test_data,
-        val_transform,
-        text_type=args.text_type,
-        root=args.root,
-        tokenizer=tokenizer
-    )
+    test_dataset = None
+    if 'memecap' in args.test_data:
+        test_dataset = MemecapDataset(
+            args.test_data,
+            val_transform,
+            text_type=args.text_type,
+            caption_preprocess = args.caption_preprocess,
+            root=args.root,
+            tokenizer=tokenizer
+        )
+    elif 'meme_retrieval_data' in args.test_data:
+        test_dataset = MemeConfigDataset(
+            args.test_data,
+            val_transform,
+            text_type=args.text_type,
+            caption_preprocess = args.caption_preprocess,
+            root=args.root,
+            tokenizer=tokenizer
+        )
+    elif 'figmeme' in args.test_data:
+        test_dataset = FigmemesDataset(
+            val_transform,
+            text_type=args.text_type,
+            root=args.image_root,
+            tokenizer=tokenizer
+        )
+
     data = {"test": get_dataset(args, test_dataset, is_train=False)}
 
     print(args)
@@ -127,12 +139,18 @@ def validate(val_loader, model, tokenizer, args):
     with torch.no_grad():
         text_features_all = []
         image_features_all = []
+        img_file_names = []
+        query_texts = []
+        target_image_files = []
         end = time.time()
         
-        for i, (images, texts) in enumerate(val_loader):
+        for i, (images, texts, img_file_name, q_text) in tqdm(enumerate(val_loader)):
             images = images.cuda(args.gpu, non_blocking=True)
             texts = texts.cuda(args.gpu, non_blocking=True)
-            
+            img_file_names.append(img_file_name[0])
+            query_texts.append(q_text[0])
+            target_image_files.append(img_file_name[0])
+            # print('img_file_name', img_file_name)
             # encode texts
             # texts_ids = tokenizer(texts).cuda(args.gpu, non_blocking=True)
             text_features = utils.get_model(model).encode_text(texts)
@@ -159,9 +177,10 @@ def validate(val_loader, model, tokenizer, args):
 
         # # measure accuracy and record loss
         # acc1, acc5 = accuracy(logits_per_image, target, topk=(1, 5))
-        img2text_recall_at_k = recall_at_k(logits_per_image, prefix = 'i2t_')
-        text2img_recall_at_k = recall_at_k(logits_per_image.T, prefix = 't2i_')
-        
+        img2text_recall_at_k, _ = recall_at_k(logits_per_image, prefix = 'i2t_')
+        text2img_recall_at_k, retrieved_files = recall_at_k(logits_per_image.T, prefix = 't2i_', file_names = img_file_names)
+        visualize_retrieved_memes(retrieved_files, query_texts, target_image_files)
+
         T2I_top1.update(text2img_recall_at_k['t2i_r1'], 1)
         T2I_top5.update(text2img_recall_at_k['t2i_r5'], 1)
         T2I_top10.update(text2img_recall_at_k['t2i_r10'], 1)
@@ -180,5 +199,5 @@ def validate(val_loader, model, tokenizer, args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Meme_Text_Retrieval_CLIP training', parents=[get_args_parser()])
     args = parser.parse_args()
-    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(args.model_dir, exist_ok=True)
     main(args)
