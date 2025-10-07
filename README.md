@@ -3,7 +3,7 @@ This repo contains the source code for my project outside course scope at Pionee
 Project title: Meme-text retrieval: a new dataset and a cross-model embedder  
 Main supervisor: Serge Belongie   
 Co-supervisor: Peter Ebert Christensen  
-Paper: [Large Vision-Language Models for Knowledge-Grounded Data Annotation of Memes]([https://doi.org/10.48550/arXiv.2501.13851](https://scholar.google.com/scholar?hl=en&as_sdt=0%2C5&q=Large+Vision-Language+Models+for+Knowledge-Grounded+Data+Annotation+of+Memes&btnG=))
+Paper: [Large Vision-Language Models for Knowledge-Grounded Data Annotation of Memes](https://scholar.google.com/scholar?hl=en&as_sdt=0%2C5&q=Large+Vision-Language+Models+for+Knowledge-Grounded+Data+Annotation+of+Memes&btnG=)
 
 # Dataset
 The proposed dataset is split into **training_set.json** and **validation_set.json**. There is a link towards each meme. 
